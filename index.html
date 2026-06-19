@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.22</title>
+<title>TourneyPro v0.23</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -246,7 +246,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.22</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.23</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -299,6 +299,7 @@ select option{background:var(--bg3);color:var(--text)}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════════
 // SUPABASE CONFIG
@@ -3080,19 +3081,28 @@ function updateQR(slug){
   const c=document.getElementById('qr-container');if(c)drawQR(c,url);
 }
 function drawQR(container,url){
-  const size=110,cells=21,cell=size/cells;
-  let svg=`<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
-  [[0,0],[0,14],[14,0]].forEach(([ox,oy])=>{
-    svg+=`<rect x="${ox*cell}" y="${oy*cell}" width="${7*cell}" height="${7*cell}" fill="#3b82f6" rx="2"/>`;
-    svg+=`<rect x="${(ox+1)*cell}" y="${(oy+1)*cell}" width="${5*cell}" height="${5*cell}" fill="white"/>`;
-    svg+=`<rect x="${(ox+2)*cell}" y="${(oy+2)*cell}" width="${3*cell}" height="${3*cell}" fill="#3b82f6"/>`;
-  });
-  let h=0;for(let i=0;i<url.length;i++)h=(h<<5)-h+url.charCodeAt(i)|0;
-  for(let r=0;r<cells;r++)for(let c=0;c<cells;c++){
-    const inF=(r<8&&c<8)||(r<8&&c>12)||(r>12&&c<8);
-    if(!inF){const b=(Math.sin(h*(r*cells+c+1)+1.5)*.5+.5)>.45;if(b)svg+=`<rect x="${c*cell}" y="${r*cell}" width="${cell}" height="${cell}" fill="#3b82f6"/>`;}
+  // Real QR code using qrcode-generator library (window.qrcode)
+  try{
+    const qr=qrcode(0,'M'); // type 0 = auto-detect size, M = medium error correction
+    qr.addData(url);
+    qr.make();
+    const cellSize=4, margin=8;
+    const moduleCount=qr.getModuleCount();
+    const size=moduleCount*cellSize+margin*2;
+    let svg=`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
+    svg+=`<rect width="${size}" height="${size}" fill="#fff"/>`;
+    for(let r=0;r<moduleCount;r++){
+      for(let c=0;c<moduleCount;c++){
+        if(qr.isDark(r,c)){
+          svg+=`<rect x="${margin+c*cellSize}" y="${margin+r*cellSize}" width="${cellSize}" height="${cellSize}" fill="#000"/>`;
+        }
+      }
+    }
+    svg+='</svg>';
+    container.innerHTML=svg;
+  }catch(e){
+    container.innerHTML='<div style="color:var(--red);font-size:11px;padding:10px">QR-Fehler: '+esc(e.message)+'</div>';
   }
-  svg+='</svg>';container.innerHTML=svg;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
