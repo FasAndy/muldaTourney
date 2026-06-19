@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.23</title>
+<title>TourneyPro v0.24</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -237,6 +237,7 @@ select option{background:var(--bg3);color:var(--text)}
 </head>
 <body>
 <div class="view-toggle">
+  <span id="sync-indicator" style="font-size:11px;color:var(--green);opacity:0;transition:opacity .3s;align-self:center;margin-right:4px;font-family:var(--font-display);font-weight:600"></span>
   <button class="vbtn active" id="vbtn-admin" onclick="setView('admin')">⚙ Admin</button>
   <button class="vbtn" id="vbtn-public" onclick="setView('public')">📱 Public</button>
 </div>
@@ -246,7 +247,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.23</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.24</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -317,7 +318,11 @@ function grpColorHex(t,gName){const gi=Object.keys(t.groups||{}).indexOf(gName);
 function grpColor(t,gName){const c=grpColorHex(t,gName);return`background:${c}22;color:${c}`;}
 const sportIcon=s=>{if(!s)return'🏆';const m=s.match(/^(\S+)/);return m?m[1]:'🏆'};
 const $ =id=>document.getElementById(id);
-function renderMain(h){const c=document.getElementById('main-content');if(c){c.innerHTML=h;c.scrollTop=0;}}
+function renderMain(h){
+  const c=document.getElementById('main-content');
+  if(c){c.innerHTML=h;c.scrollTop=0;}
+  scheduleSync();
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // DATA
@@ -2527,8 +2532,24 @@ function cancelNewTourney(){
   // Remove the tournament and go back to home
   DB.tournaments=DB.tournaments.filter(x=>x.id!==t.id);
   DB.activeTournamentId=null;
+  async function initApp(){
+  // Try to restore the most recently synced tournament (admin reload case)
+  try{
+    const ids=await loadAllTournamentIdsFromCloud();
+    if(ids.length){
+      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
+      const cloudT=await loadTournamentFromCloud(latestId);
+      if(cloudT){
+        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
+        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.unshift(cloudT);
+      }
+    }
+  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); }
+  _cloudLoaded=true;
   openHome();
-checkTipUrlParam();
+  checkTipUrlParam();
+}
+initApp();
 }
 
 
@@ -2669,10 +2690,22 @@ function downloadAllQR(){
 }
 
 // ── Auto-login via QR code URL param ───────────────────────────────────
-function checkTipUrlParam(){
+async function checkTipUrlParam(){
   const params=new URLSearchParams(window.location.search);
   const code=params.get('tip');
   if(code){
+    // Load the actual active tournament from cloud first (this device may have
+    // never seen this tournament — e.g. fresh QR scan on a phone)
+    const ids=await loadAllTournamentIdsFromCloud();
+    if(ids.length){
+      // Most recently updated tournament is the active one
+      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
+      const cloudT=await loadTournamentFromCloud(latestId);
+      if(cloudT){
+        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
+        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.push(cloudT);
+      }
+    }
     setView('public');
     setTimeout(()=>{
       const tab=document.getElementById('pub-tab-tipping');
@@ -2684,8 +2717,8 @@ function checkTipUrlParam(){
           const t=DB.tournaments.find(x=>!x.archived)||DB.tournaments[0];
           if(t) tipLogin(t.id);
         }
-      },100);
-    },100);
+      },150);
+    },150);
   }
 }
 
@@ -2953,6 +2986,73 @@ async function renderTipForm(){
     ${!open.length&&!closed.length?`<div style="color:var(--muted);text-align:center;padding:20px">Noch keine Spiele im Spielplan.</div>`:''}`;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// CLOUD SYNC (Supabase) — Turnierdaten zentral speichern
+// ═══════════════════════════════════════════════════════════════════════
+let _syncTimer=null;
+let _syncInProgress=false;
+let _cloudLoaded=false;
+
+function scheduleSync(){
+  if(!_cloudLoaded)return; // don't sync until initial load is done
+  if(_syncTimer)clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>{ syncActiveTournament(); }, 1500);
+}
+
+async function syncActiveTournament(){
+  const t=T();
+  if(!t)return;
+  if(_syncInProgress)return;
+  _syncInProgress=true;
+  const indicator=document.getElementById('sync-indicator');
+  if(indicator){indicator.textContent='💾 Speichert...';indicator.style.opacity='1';}
+  try{
+    const {error}=await _sb.from('tournaments_sync').upsert({
+      id: t.id,
+      data: t,
+      updated_at: new Date().toISOString()
+    },{onConflict:'id'});
+    if(error){
+      console.error('Sync error:',error);
+      if(indicator){indicator.textContent='⚠️ Sync-Fehler';indicator.style.color='var(--red)';}
+    } else {
+      if(indicator){indicator.textContent='✅ Gespeichert';indicator.style.color='var(--green)';}
+      setTimeout(()=>{if(indicator)indicator.style.opacity='0';},2000);
+    }
+  } catch(e){
+    console.error('Sync exception:',e);
+  }
+  _syncInProgress=false;
+}
+
+async function loadTournamentFromCloud(tournamentId){
+  const {data,error}=await _sb.from('tournaments_sync')
+    .select('data,updated_at')
+    .eq('id',tournamentId)
+    .single();
+  if(error||!data)return null;
+  return data.data;
+}
+
+async function loadAllTournamentIdsFromCloud(){
+  const {data,error}=await _sb.from('tournaments_sync').select('id,updated_at');
+  if(error)return [];
+  return data||[];
+}
+
+async function pullLatestTournament(tournamentId){
+  // For public view: always fetch fresh from cloud on load
+  const cloudData=await loadTournamentFromCloud(tournamentId);
+  if(cloudData){
+    const idx=DB.tournaments.findIndex(x=>x.id===tournamentId);
+    if(idx>=0) DB.tournaments[idx]=cloudData;
+    else DB.tournaments.push(cloudData);
+    return cloudData;
+  }
+  return null;
+}
+
 function createTourney(){
   const t=makeTourney({id:'t'+Date.now(),name:'',sport:'',phase:'Gruppenphase',slug:''});
   t._isNew=true;
@@ -2975,8 +3075,24 @@ function unarchiveTourney(id){const t=DB.tournaments.find(x=>x.id===id);if(t){t.
 function deleteTourney(id){
   if(!confirm('Turnier wirklich löschen?'))return;
   DB.tournaments=DB.tournaments.filter(t=>t.id!==id);
-  if(DB.activeTournamentId===id){DB.activeTournamentId=null;openHome();
-checkTipUrlParam();}
+  if(DB.activeTournamentId===id){DB.activeTournamentId=null;async function initApp(){
+  // Try to restore the most recently synced tournament (admin reload case)
+  try{
+    const ids=await loadAllTournamentIdsFromCloud();
+    if(ids.length){
+      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
+      const cloudT=await loadTournamentFromCloud(latestId);
+      if(cloudT){
+        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
+        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.unshift(cloudT);
+      }
+    }
+  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); }
+  _cloudLoaded=true;
+  openHome();
+  checkTipUrlParam();
+}
+initApp();}
   else renderMain(pages.home());
 }
 function updateSBForT(){
@@ -3140,9 +3256,12 @@ function setView(v){
 // PUBLIC VIEW
 // ═══════════════════════════════════════════════════════════════════════
 let _pubSort='chrono';
-function renderPublic(){
-  const t=T()||DB.tournaments.find(x=>!x.archived);
+async function renderPublic(){
+  let t=T()||DB.tournaments.find(x=>!x.archived);
   if(!t){document.getElementById('pub-title').textContent='TourneyPro';document.getElementById('pub-sub').textContent='Kein Turnier';document.getElementById('pub-logo').innerHTML='🏆';return;}
+  // Fetch freshest data from cloud (e.g. if opened on a different device via QR scan)
+  const fresh=await pullLatestTournament(t.id);
+  if(fresh) t=fresh;
   document.getElementById('pub-title').textContent=t.name;
   document.getElementById('pub-sub').textContent=t.sport+' · '+t.phase;
   document.getElementById('pub-logo').innerHTML=t.logo?`<img src="${t.logo}" style="width:100%;height:100%;object-fit:cover">`:sportIcon(t.sport);
@@ -3577,8 +3696,24 @@ function reopenGroupPhase(){
   showPage('overview');
 }
 
-openHome();
-checkTipUrlParam();
+async function initApp(){
+  // Try to restore the most recently synced tournament (admin reload case)
+  try{
+    const ids=await loadAllTournamentIdsFromCloud();
+    if(ids.length){
+      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
+      const cloudT=await loadTournamentFromCloud(latestId);
+      if(cloudT){
+        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
+        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.unshift(cloudT);
+      }
+    }
+  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); }
+  _cloudLoaded=true;
+  openHome();
+  checkTipUrlParam();
+}
+initApp();
 </script>
 </body>
 </html>
