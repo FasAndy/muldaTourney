@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.32</title>
+<title>TourneyPro v0.34</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -247,7 +247,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.32</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.34</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -1716,7 +1716,14 @@ overview:()=>{
   const total=t.matches.length;
   const allPlayed=total>0&&played===total;
   // Next upcoming matches
-  const upcoming=t.matches.filter(m=>!m.played).slice(0,4);
+  const byTimeOv=(a,b)=>{
+    const ta=timeToMin(a.time), tb=timeToMin(b.time);
+    if(ta===null&&tb===null)return 0;
+    if(ta===null)return 1;
+    if(tb===null)return -1;
+    return ta-tb;
+  };
+  const upcoming=t.matches.filter(m=>!m.played).sort(byTimeOv).slice(0,4);
   if(t.koPhase) return overviewKO(t);
   return`
 ${t.archived?`<div class="alert alert-amber">📦 Archiviert – schreibgeschützt.</div>`:''}
@@ -2474,15 +2481,17 @@ custom_bracket:()=>{
 
 qr:()=>{
   const t=T();if(!t)return'';
-  const url=`https://tourneyp.ro/live/${esc(t.slug)}`;
+  const base=window.location.origin+window.location.pathname;
+  const url=`${base}?t=${encodeURIComponent(t.slug)}`;
   return`
 <div style="margin-bottom:18px"><h1>📱 QR-Code & Teilen</h1></div>
+<div class="alert alert-blue"><span>ℹ️</span><span>Dieser Link führt direkt zu <strong>diesem Turnier</strong> in der Public-Ansicht — auch wenn später weitere Turniere angelegt werden.</span></div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
   <div class="card">
     <h3 style="margin-bottom:10px">Public Link</h3>
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px">
       <div class="qr-box" id="qr-container"></div>
-      <div style="font-size:11px;color:var(--muted);text-align:center;word-break:break-all;max-width:200px" id="qr-url-text">${url}</div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;word-break:break-all;max-width:260px" id="qr-url-text">${url}</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center">
         <button class="btn btn-primary" onclick="copyLink()">📋 Kopieren</button>
         <button class="btn" onclick="setView('public')">👁 Vorschau</button>
@@ -2492,7 +2501,7 @@ qr:()=>{
   </div>
   <div class="card">
     <h3 style="margin-bottom:10px">Einstellungen</h3>
-    <div class="form-group"><label class="form-label">Slug</label>
+    <div class="form-group"><label class="form-label">Slug (Teil des Links, eindeutig pro Turnier)</label>
       <input value="${esc(t.slug)}" id="slug-inp" oninput="updateQR(this.value)">
     </div>
     <div class="form-group"><label class="form-label">Sichtbarkeit</label>
@@ -2558,20 +2567,33 @@ function cancelNewTourney(){
   DB.tournaments=DB.tournaments.filter(x=>x.id!==t.id);
   DB.activeTournamentId=null;
   async function initApp(){
-  // Try to restore the most recently synced tournament (admin reload case)
+  // Tournament resolution priority:
+  // 1) ?t=<slug> in URL — explicit tournament selection (what public links/QR codes use)
+  // 2) Most recently synced tournament — admin convenience on reload
   try{
-    const ids=await loadAllTournamentIdsFromCloud();
-    if(ids.length){
-      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
-      const cloudT=await loadTournamentFromCloud(latestId);
-      if(cloudT){
-        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
-        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.unshift(cloudT);
+    const urlSlug=getTournamentSlugFromUrl();
+    let resolved=null;
+    if(urlSlug){
+      resolved=await loadTournamentBySlugFromCloud(urlSlug);
+    }
+    if(!resolved){
+      const ids=await loadAllTournamentIdsFromCloud();
+      if(ids.length){
+        const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
+        resolved=await loadTournamentFromCloud(latestId);
       }
     }
-  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); }
+    if(resolved){
+      const idx=DB.tournaments.findIndex(x=>x.id===resolved.id);
+      if(idx>=0) DB.tournaments[idx]=resolved; else DB.tournaments.unshift(resolved);
+    }
+    _resolvedTournamentId = resolved?.id || null;
+  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
   openHome();
+  // openHome() resets activeTournamentId to null (for the admin tournament-list view) —
+  // re-apply our resolved tournament afterwards so public/admin views still resolve T() correctly.
+  if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
 
   // Admin access: only reachable via ?adminMode URL param + password
   if(checkAdminModeParam()){
@@ -2677,7 +2699,9 @@ function toggleQRView(){
 function renderQRGrid(){
   const grid=document.getElementById('tip-qr-grid');
   if(!grid||!_loadedTipCodes.length)return;
+  const t=T();
   const baseUrl=window.location.origin+window.location.pathname;
+  const tParam=t?.slug?('&t='+encodeURIComponent(t.slug)):'';
   grid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
     ${_loadedTipCodes.map(p=>`
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">
@@ -2693,7 +2717,7 @@ function renderQRGrid(){
   setTimeout(()=>{
     _loadedTipCodes.forEach(p=>{
       const el=document.getElementById('qr-'+p.id);
-      if(el) drawQR(el, baseUrl+'?tip='+encodeURIComponent(p.code));
+      if(el) drawQR(el, baseUrl+'?tip='+encodeURIComponent(p.code)+tParam);
     });
   },20);
 }
@@ -2732,18 +2756,8 @@ async function checkTipUrlParam(){
   const params=new URLSearchParams(window.location.search);
   const code=params.get('tip');
   if(code){
-    // Load the actual active tournament from cloud first (this device may have
-    // never seen this tournament — e.g. fresh QR scan on a phone)
-    const ids=await loadAllTournamentIdsFromCloud();
-    if(ids.length){
-      // Most recently updated tournament is the active one
-      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
-      const cloudT=await loadTournamentFromCloud(latestId);
-      if(cloudT){
-        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
-        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.push(cloudT);
-      }
-    }
+    // The correct tournament was already resolved in initApp() via ?t=<slug>
+    // (or the latest-synced fallback). No need to re-resolve here.
     setView('public');
     setTimeout(()=>{
       const tab=document.getElementById('pub-tab-tipping');
@@ -2752,7 +2766,7 @@ async function checkTipUrlParam(){
         const inp=document.getElementById('tip-code-inp');
         if(inp){
           inp.value=code;
-          const t=DB.tournaments.find(x=>!x.archived)||DB.tournaments[0];
+          const t=T()||DB.tournaments.find(x=>!x.archived)||DB.tournaments[0];
           if(t) tipLogin(t.id);
         }
       },150);
@@ -3143,6 +3157,7 @@ async function renderTipForm(){
 // ═══════════════════════════════════════════════════════════════════════
 // CLOUD SYNC (Supabase) — Turnierdaten zentral speichern
 // ═══════════════════════════════════════════════════════════════════════
+let _resolvedTournamentId=null;
 let _syncTimer=null;
 let _syncInProgress=false;
 let _cloudLoaded=false;
@@ -3192,6 +3207,20 @@ async function loadAllTournamentIdsFromCloud(){
   const {data,error}=await _sb.from('tournaments_sync').select('id,updated_at');
   if(error)return [];
   return data||[];
+}
+
+async function loadTournamentBySlugFromCloud(slug){
+  // Slug lives inside the jsonb 'data' column, so we fetch all and match client-side
+  // (fine at this scale — a handful of tournaments at most)
+  const {data,error}=await _sb.from('tournaments_sync').select('id,data,updated_at');
+  if(error||!data)return null;
+  const match=data.find(row=>row.data?.slug===slug);
+  return match?match.data:null;
+}
+
+function getTournamentSlugFromUrl(){
+  const params=new URLSearchParams(window.location.search);
+  return params.get('t');
 }
 
 async function pullLatestTournament(tournamentId){
@@ -3281,20 +3310,33 @@ function deleteTourney(id){
   if(!confirm('Turnier wirklich löschen?'))return;
   DB.tournaments=DB.tournaments.filter(t=>t.id!==id);
   if(DB.activeTournamentId===id){DB.activeTournamentId=null;async function initApp(){
-  // Try to restore the most recently synced tournament (admin reload case)
+  // Tournament resolution priority:
+  // 1) ?t=<slug> in URL — explicit tournament selection (what public links/QR codes use)
+  // 2) Most recently synced tournament — admin convenience on reload
   try{
-    const ids=await loadAllTournamentIdsFromCloud();
-    if(ids.length){
-      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
-      const cloudT=await loadTournamentFromCloud(latestId);
-      if(cloudT){
-        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
-        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.unshift(cloudT);
+    const urlSlug=getTournamentSlugFromUrl();
+    let resolved=null;
+    if(urlSlug){
+      resolved=await loadTournamentBySlugFromCloud(urlSlug);
+    }
+    if(!resolved){
+      const ids=await loadAllTournamentIdsFromCloud();
+      if(ids.length){
+        const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
+        resolved=await loadTournamentFromCloud(latestId);
       }
     }
-  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); }
+    if(resolved){
+      const idx=DB.tournaments.findIndex(x=>x.id===resolved.id);
+      if(idx>=0) DB.tournaments[idx]=resolved; else DB.tournaments.unshift(resolved);
+    }
+    _resolvedTournamentId = resolved?.id || null;
+  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
   openHome();
+  // openHome() resets activeTournamentId to null (for the admin tournament-list view) —
+  // re-apply our resolved tournament afterwards so public/admin views still resolve T() correctly.
+  if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
 
   // Admin access: only reachable via ?adminMode URL param + password
   if(checkAdminModeParam()){
@@ -3409,7 +3451,8 @@ function copyLink(){
 }
 function updateQR(slug){
   const t=T();if(t)t.slug=slug||t.slug;
-  const url=`https://tourneyp.ro/live/${slug||''}`;
+  const base=window.location.origin+window.location.pathname;
+  const url=`${base}?t=${encodeURIComponent(slug||t?.slug||'')}`;
   const el=document.getElementById('qr-url-text');if(el)el.textContent=url;
   const c=document.getElementById('qr-container');if(c)drawQR(c,url);
 }
@@ -3952,20 +3995,33 @@ function reopenGroupPhase(){
 }
 
 async function initApp(){
-  // Try to restore the most recently synced tournament (admin reload case)
+  // Tournament resolution priority:
+  // 1) ?t=<slug> in URL — explicit tournament selection (what public links/QR codes use)
+  // 2) Most recently synced tournament — admin convenience on reload
   try{
-    const ids=await loadAllTournamentIdsFromCloud();
-    if(ids.length){
-      const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
-      const cloudT=await loadTournamentFromCloud(latestId);
-      if(cloudT){
-        const idx=DB.tournaments.findIndex(x=>x.id===latestId);
-        if(idx>=0) DB.tournaments[idx]=cloudT; else DB.tournaments.unshift(cloudT);
+    const urlSlug=getTournamentSlugFromUrl();
+    let resolved=null;
+    if(urlSlug){
+      resolved=await loadTournamentBySlugFromCloud(urlSlug);
+    }
+    if(!resolved){
+      const ids=await loadAllTournamentIdsFromCloud();
+      if(ids.length){
+        const latestId=ids.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at))[0].id;
+        resolved=await loadTournamentFromCloud(latestId);
       }
     }
-  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); }
+    if(resolved){
+      const idx=DB.tournaments.findIndex(x=>x.id===resolved.id);
+      if(idx>=0) DB.tournaments[idx]=resolved; else DB.tournaments.unshift(resolved);
+    }
+    _resolvedTournamentId = resolved?.id || null;
+  }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
   openHome();
+  // openHome() resets activeTournamentId to null (for the admin tournament-list view) —
+  // re-apply our resolved tournament afterwards so public/admin views still resolve T() correctly.
+  if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
 
   // Admin access: only reachable via ?adminMode URL param + password
   if(checkAdminModeParam()){
