@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.38</title>
+<title>TourneyPro v0.39</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -247,7 +247,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.38</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.39</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -375,7 +375,11 @@ function makeTourney(cfg={}){
     customBracket: cfg.customBracket||{slots:8,rounds:[]},
     // Tippspiel
     tippingEnabled: cfg.tippingEnabled||false,
-    tippingPoints: cfg.tippingPoints||{exactResult:5, correctDiff:3, correctTrend:2},
+    tippingMode: cfg.tippingMode||'A',
+    tippingPoints: cfg.tippingPoints||{
+      group:{exactResult:5,correctDiff:3,correctTrend:2},
+      ko:{exactResult:7,correctDiff:5,correctTrend:3}
+    },
   };
 }
 
@@ -1953,21 +1957,32 @@ ${!t._isNew&&t.started?`<div class="alert alert-amber"><span>⚠️</span><span>
     </label>
   </div>
   <div id="tipping-config" style="${t.tippingEnabled?'':'display:none'}">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
-      <div class="form-group" style="margin:0">
-        <label class="form-label">Punkte für exaktes Ergebnis</label>
-        <input type="number" id="tip-pts-exact" value="${t.tippingPoints?.exactResult??5}" min="0" max="99">
-      </div>
-      <div class="form-group" style="margin:0">
-        <label class="form-label" style="display:flex;align-items:center;gap:5px">Punkte für richtige Differenz
-          <span title="Tordifferenz stimmt überein, aber nicht das exakte Ergebnis. Beispiel: Tipp 2:1 (Diff. +1), Ergebnis 3:2 (Diff. +1)." style="cursor:help;color:var(--muted);font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:50%;width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">?</span>
-        </label>
-        <input type="number" id="tip-pts-diff" value="${t.tippingPoints?.correctDiff??3}" min="0" max="99">
-      </div>
-      <div class="form-group" style="margin:0">
-        <label class="form-label">Punkte für richtige Tendenz (S/U/N)</label>
-        <input type="number" id="tip-pts-trend" value="${t.tippingPoints?.correctTrend??2}" min="0" max="99">
-      </div>
+    <div class="form-group">
+      <label class="form-label">Tipp-Modus</label>
+      <select id="tip-mode" onchange="updateTipModeDesc(this.value)">
+        <option value="A" ${(t.tippingMode||'A')==='A'?'selected':''}>Modus A — Offen: alle tippen alles, alle Punkte global</option>
+        <option value="B" ${t.tippingMode==='B'?'selected':''}>Modus B — Gruppen-Loyalität: jeder wählt eine Gruppe</option>
+        <option value="C" ${t.tippingMode==='C'?'selected':''}>Modus C — Bestes Ergebnis: beste Gruppe + KO zählen global</option>
+      </select>
+      <div id="tip-mode-desc" style="font-size:12px;color:var(--muted);margin-top:6px;padding:8px;background:var(--bg3);border-radius:var(--r)">${(t.tippingMode||'A')==='A'?'Alle Teilnehmer tippen auf alle Spiele. Globale Rangliste aus allen Gruppen + KO.':t.tippingMode==='B'?'Jeder Teilnehmer wählt beim ersten Login eine Gruppe. Er tippt nur die Spiele dieser Gruppe + KO-Phase.':'Jeder tippt alle Spiele. Fürs globale Ranking zählt nur die Gruppe mit den meisten Punkten — plus KO-Punkte obendrauf.'}</div>
+    </div>
+    <div style="margin:14px 0 6px;font-size:11px;font-weight:700;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--gold)">Punkte — Gruppenphase</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+      <div class="form-group" style="margin:0"><label class="form-label">Exaktes Ergebnis</label>
+        <input type="number" id="tip-pts-g-exact" value="${t.tippingPoints?.group?.exactResult??5}" min="0" max="99"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Richtige Differenz</label>
+        <input type="number" id="tip-pts-g-diff" value="${t.tippingPoints?.group?.correctDiff??3}" min="0" max="99"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Richtige Tendenz</label>
+        <input type="number" id="tip-pts-g-trend" value="${t.tippingPoints?.group?.correctTrend??2}" min="0" max="99"></div>
+    </div>
+    <div style="margin:14px 0 6px;font-size:11px;font-weight:700;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--gold)">Punkte — K.O.-Phase</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+      <div class="form-group" style="margin:0"><label class="form-label">Exaktes Ergebnis</label>
+        <input type="number" id="tip-pts-k-exact" value="${t.tippingPoints?.ko?.exactResult??7}" min="0" max="99"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Richtige Differenz</label>
+        <input type="number" id="tip-pts-k-diff" value="${t.tippingPoints?.ko?.correctDiff??5}" min="0" max="99"></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Richtige Tendenz</label>
+        <input type="number" id="tip-pts-k-trend" value="${t.tippingPoints?.ko?.correctTrend??3}" min="0" max="99"></div>
     </div>
     <button class="btn btn-primary" onclick="saveTippingSettings()">💾 Speichern</button>
     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
@@ -2645,13 +2660,30 @@ function toggleTippingConfig(){
 function saveTippingSettings(){
   const t=T();if(!t)return;
   t.tippingEnabled=document.getElementById('tipping-enabled')?.checked||false;
+  t.tippingMode=document.getElementById('tip-mode')?.value||'A';
   t.tippingPoints={
-    exactResult:parseInt(document.getElementById('tip-pts-exact')?.value)??5,
-    correctDiff:parseInt(document.getElementById('tip-pts-diff')?.value)??3,
-    correctTrend:parseInt(document.getElementById('tip-pts-trend')?.value)??2
+    group:{
+      exactResult:parseInt(document.getElementById('tip-pts-g-exact')?.value)||5,
+      correctDiff:parseInt(document.getElementById('tip-pts-g-diff')?.value)||3,
+      correctTrend:parseInt(document.getElementById('tip-pts-g-trend')?.value)||2
+    },
+    ko:{
+      exactResult:parseInt(document.getElementById('tip-pts-k-exact')?.value)||7,
+      correctDiff:parseInt(document.getElementById('tip-pts-k-diff')?.value)||5,
+      correctTrend:parseInt(document.getElementById('tip-pts-k-trend')?.value)||3
+    }
   };
   alert('Tippspiel-Einstellungen gespeichert!');
   showPage('settings');
+}
+function updateTipModeDesc(mode){
+  const el=document.getElementById('tip-mode-desc');if(!el)return;
+  const d={
+    A:'Alle Teilnehmer tippen auf alle Spiele. Globale Rangliste aus allen Gruppen + KO.',
+    B:'Jeder Teilnehmer wählt beim ersten Login eine Gruppe. Er tippt nur die Spiele dieser Gruppe + KO-Phase.',
+    C:'Jeder tippt alle Spiele. Fürs globale Ranking zählt nur die Gruppe mit den meisten Punkten — plus KO-Punkte obendrauf.'
+  };
+  el.textContent=d[mode]||'';
 }
 
 
@@ -2938,16 +2970,16 @@ async function loadMyTips(tournamentId){
 }
 
 
-function calcTipPoints(tipH,tipA,actualH,actualA,points){
-  // Returns {pts, category} — category: 'exact'|'diff'|'trend'|'none'
+function calcTipPoints(tipH,tipA,actualH,actualA,tippingPoints,isKO){
+  // Returns {pts, category} — 'exact'|'diff'|'trend'|'none'
+  // Supports split format {group:{...},ko:{...}} and legacy flat format
   if(actualH===null||actualH===undefined||tipH===null||tipH===undefined)return{pts:0,category:'none'};
+  const pts_cfg=tippingPoints?.group?(isKO?tippingPoints.ko:tippingPoints.group):tippingPoints;
   const exact=tipH===actualH&&tipA===actualA;
-  if(exact)return{pts:points?.exactResult??5,category:'exact'};
+  if(exact)return{pts:pts_cfg?.exactResult??5,category:'exact'};
   const tipDiff=tipH-tipA, actualDiff=actualH-actualA;
-  const sameDiff=tipDiff===actualDiff;
-  if(sameDiff)return{pts:points?.correctDiff??3,category:'diff'};
-  const trend=Math.sign(tipDiff)===Math.sign(actualDiff);
-  if(trend)return{pts:points?.correctTrend??2,category:'trend'};
+  if(tipDiff===actualDiff)return{pts:pts_cfg?.correctDiff??3,category:'diff'};
+  if(Math.sign(tipDiff)===Math.sign(actualDiff))return{pts:pts_cfg?.correctTrend??2,category:'trend'};
   return{pts:0,category:'none'};
 }
 
@@ -2957,7 +2989,7 @@ async function loadMyRank(tournamentId){
   if(!t)return null;
   // Only participants who have submitted at least one tip count as "active"
   const {data:allPicksEver}=await _sb.from('tip_picks')
-    .select('participant_id').eq('tournament_id',tournamentId);
+    .select('participant_id,match_id').eq('tournament_id',tournamentId);
   const activeIds=new Set((allPicksEver||[]).map(p=>p.participant_id));
   const total=activeIds.size;
   if(!total)return{rank:null,total:0,pts:0};
@@ -2979,7 +3011,8 @@ async function loadMyRank(tournamentId){
       const actualH=m.result?Math.floor(m.result.hg):m.hg;
       const actualA=m.result?Math.floor(m.result.ag):m.ag;
       if(actualH===null||actualH===undefined)return;
-      const r=calcTipPoints(pick.home_goals,pick.away_goals,actualH,actualA,t.tippingPoints);
+      const isKO_=!t.matches.find(x=>String(x.id)===pick.match_id);
+      const r=calcTipPoints(pick.home_goals,pick.away_goals,actualH,actualA,t.tippingPoints,isKO_);
       pts[pick.participant_id]=(pts[pick.participant_id]||0)+r.pts;
     });
   }
@@ -2994,92 +3027,125 @@ function initTipping(){
   else renderTipLogin();
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// TIPPING RANKING ENGINE — modes A, B, C
+// ═══════════════════════════════════════════════════════════════════════
+function getMatchPhase(t,matchId){
+  return t.matches.find(x=>String(x.id)===String(matchId))?'group':'ko';
+}
+function getMatchGroup(t,matchId){
+  return t.matches.find(x=>String(x.id)===String(matchId))?.grp||null;
+}
+function computeRankings(t,participants,scoredPicks,allPicksEver){
+  const mode=t.tippingMode||'A';
+  const gNames=Object.keys(t.groups);
+  // Init per-participant per-group points map
+  const ptsByGroup={};
+  participants.forEach(p=>{
+    ptsByGroup[p.id]={__ko:0};
+    gNames.forEach(g=>{ptsByGroup[p.id][g]=0;});
+  });
+  // Calculate scored points
+  scoredPicks.forEach(pick=>{
+    if(!ptsByGroup[pick.participant_id])return;
+    const phase=getMatchPhase(t,pick.match_id);
+    const m=t.matches.find(x=>String(x.id)===pick.match_id)
+      ||(t.bracket?.matches||[]).find(x=>x.id===pick.match_id);
+    if(!m)return;
+    const aH=m.result?Math.floor(m.result.hg):m.hg;
+    const aA=m.result?Math.floor(m.result.ag):m.ag;
+    if(aH===null||aH===undefined)return;
+    const r=calcTipPoints(pick.home_goals,pick.away_goals,aH,aA,t.tippingPoints,phase==='ko');
+    if(phase==='ko'){ptsByGroup[pick.participant_id].__ko+=r.pts;}
+    else if(m.grp){ptsByGroup[pick.participant_id][m.grp]=(ptsByGroup[pick.participant_id][m.grp]||0)+r.pts;}
+  });
+  // Global pts per mode
+  function globalPts(p){
+    const pg=ptsByGroup[p.id];if(!pg)return 0;
+    const koPts=pg.__ko||0;
+    if(mode==='A')return gNames.reduce((s,g)=>s+(pg[g]||0),0)+koPts;
+    if(mode==='B'){const cg=p.chosen_group;return(cg&&pg[cg]?pg[cg]:0)+koPts;}
+    return Math.max(0,...gNames.map(g=>pg[g]||0))+koPts; // C
+  }
+  const withPts=participants.map(p=>({
+    ...p,pts:globalPts(p),ptsByGroup:ptsByGroup[p.id],
+    tipsCount:(allPicksEver||[]).filter(pk=>pk.participant_id===p.id).length
+  }));
+  const globalRanking=[...withPts].sort((a,b)=>b.pts-a.pts);
+  const byGroup={};
+  gNames.forEach(g=>{
+    const tipped=withPts.filter(p=>(allPicksEver||[]).some(pk=>pk.participant_id===p.id&&getMatchGroup(t,pk.match_id)===g));
+    byGroup[g]=[...tipped].sort((a,b)=>(b.ptsByGroup?.[g]||0)-(a.ptsByGroup?.[g]||0));
+  });
+  const koTipped=withPts.filter(p=>(allPicksEver||[]).some(pk=>pk.participant_id===p.id&&getMatchPhase(t,pk.match_id)==='ko'));
+  const byKO=[...koTipped].sort((a,b)=>(b.ptsByGroup?.__ko||0)-(a.ptsByGroup?.__ko||0));
+  return{global:globalRanking,byGroup,byKO};
+}
+
 async function loadAdminRanking(){
   const t=T();if(!t)return;
   const el=document.getElementById('admin-ranking-content');
   if(!el)return;
   el.innerHTML='<div style="color:var(--muted);font-size:13px">Laden...</div>';
-
-  const {data:participants,error:pErr}=await _sb.from('tip_participants')
-    .select('id,name,code').eq('tournament_id',t.id).order('name',{ascending:true});
+  const mode=t.tippingMode||'A';
+  const gNames=Object.keys(t.groups);
+  const {data:allPart,error:pErr}=await _sb.from('tip_participants')
+    .select('id,name,code,chosen_group').eq('tournament_id',t.id).order('name',{ascending:true});
   if(pErr){el.innerHTML='<div style="color:var(--red)">Fehler: '+esc(pErr.message)+'</div>';return;}
-  if(!participants||!participants.length){
-    el.innerHTML='<div style="color:var(--muted);font-size:13px">Noch keine Teilnehmer registriert.</div>';
-    return;
+  const {data:allPicksEver}=await _sb.from('tip_picks').select('participant_id,match_id').eq('tournament_id',t.id);
+  const activeIds=new Set((allPicksEver||[]).map(p=>p.participant_id));
+  const active=(allPart||[]).filter(p=>activeIds.has(p.id));
+  const inactive=(allPart||[]).length-active.length;
+  if(!active.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:13px">Noch keine Tipps abgegeben. ('+((allPart||[]).length)+' registrierte Codes)</div>';return;
   }
-
-  // ALL picks ever made by these participants (regardless of match status)
-  // — used to determine who has "actively participated" (≥1 tip submitted)
-  const {data:allPicksEver,error:apErr}=await _sb.from('tip_picks')
-    .select('participant_id').eq('tournament_id',t.id);
-  if(apErr){el.innerHTML='<div style="color:var(--red)">Fehler: '+esc(apErr.message)+'</div>';return;}
-  const activeParticipantIds=new Set((allPicksEver||[]).map(p=>p.participant_id));
-
-  // Only count participants who submitted at least one tip
-  const activeParticipants=participants.filter(p=>activeParticipantIds.has(p.id));
-  const inactiveCount=participants.length-activeParticipants.length;
-
-  if(!activeParticipants.length){
-    el.innerHTML='<div style="color:var(--muted);font-size:13px">Es wurden noch keine Tipps abgegeben. ('+participants.length+' registrierte Codes, aber 0 aktive Teilnehmer)</div>';
-    return;
-  }
-
-  // All played matches (group + KO)
-  const playedGroup=t.matches.filter(m=>m.played);
-  const playedKO=(t.bracket?.matches||[]).filter(m=>m.result);
-  const playedIds=[...playedGroup.map(m=>String(m.id)),...playedKO.map(m=>m.id)];
-
-  let allPicks=[];
+  const playedIds=[...t.matches.filter(m=>m.played).map(m=>String(m.id)),
+    ...(t.bracket?.matches||[]).filter(m=>m.result).map(m=>m.id)];
+  let scoredPicks=[];
   if(playedIds.length){
-    const {data,error}=await _sb.from('tip_picks')
+    const {data}=await _sb.from('tip_picks')
       .select('participant_id,match_id,home_goals,away_goals')
-      .eq('tournament_id',t.id)
-      .in('match_id',playedIds);
-    if(error){el.innerHTML='<div style="color:var(--red)">Fehler: '+esc(error.message)+'</div>';return;}
-    allPicks=data||[];
+      .eq('tournament_id',t.id).in('match_id',playedIds);
+    scoredPicks=data||[];
   }
-
-  // Calculate points per ACTIVE participant only
-  const pts={};
-  const tipsCount={};
-  activeParticipants.forEach(p=>{pts[p.id]=0;tipsCount[p.id]=0;});
-  allPicks.forEach(pick=>{
-    const m=t.matches.find(x=>String(x.id)===pick.match_id)
-      ||(t.bracket?.matches||[]).find(x=>x.id===pick.match_id);
-    if(!m)return;
-    const actualH=m.result?Math.floor(m.result.hg):m.hg;
-    const actualA=m.result?Math.floor(m.result.ag):m.ag;
-    if(actualH===null||actualH===undefined)return;
-    tipsCount[pick.participant_id]=(tipsCount[pick.participant_id]||0)+1;
-    const r=calcTipPoints(pick.home_goals,pick.away_goals,actualH,actualA,t.tippingPoints);
-    pts[pick.participant_id]=(pts[pick.participant_id]||0)+r.pts;
-  });
-
-  const ranked=activeParticipants.map(p=>({...p,pts:pts[p.id]||0,tipsCount:tipsCount[p.id]||0}))
-    .sort((a,b)=>b.pts-a.pts);
-
-  const totalPlayed=playedIds.length;
-
-  el.innerHTML=`
+  const {global,byGroup,byKO}=computeRankings(t,active,scoredPicks,allPicksEver);
+  const mLabel={A:'Modus A — Offen',B:'Modus B — Gruppen-Loyalität',C:'Modus C — Bestes Ergebnis'}[mode];
+  const rankRow=(p,i,pts)=>`<tr>
+    <td><span class="rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</span></td>
+    <td style="font-weight:500">${esc(p.name)}${mode==='B'&&p.chosen_group?` <span style="font-size:10px;color:var(--muted)">(${esc(p.chosen_group)})</span>`:''}</td>
+    <td style="text-align:right;font-weight:700;color:var(--gold)">${pts??p.pts}</td>
+  </tr>`;
+  let html=`<div style="font-size:11px;color:var(--muted);margin-bottom:12px;font-family:var(--font-display);font-weight:600;letter-spacing:.04em">${mLabel}</div>
   <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
-    <div class="stat-card"><div style="font-size:20px;margin-bottom:4px">👥</div><div style="font-size:22px;font-weight:700;color:var(--gold)">${activeParticipants.length}</div><div style="font-size:11px;color:var(--muted)">Aktive Teilnehmer</div></div>
-    <div class="stat-card"><div style="font-size:20px;margin-bottom:4px">✅</div><div style="font-size:22px;font-weight:700;color:var(--gold)">${totalPlayed}</div><div style="font-size:11px;color:var(--muted)">Ausgewertete Spiele</div></div>
-    <div class="stat-card"><div style="font-size:20px;margin-bottom:4px">🏆</div><div style="font-size:18px;font-weight:700;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ranked[0]?esc(ranked[0].name):'—'}</div><div style="font-size:11px;color:var(--muted)">Aktuell führend</div></div>
+    <div class="stat-card"><div style="font-size:20px;margin-bottom:4px">👥</div><div style="font-size:22px;font-weight:700;color:var(--gold)">${active.length}</div><div style="font-size:11px;color:var(--muted)">Aktive Teilnehmer</div></div>
+    <div class="stat-card"><div style="font-size:20px;margin-bottom:4px">✅</div><div style="font-size:22px;font-weight:700;color:var(--gold)">${playedIds.length}</div><div style="font-size:11px;color:var(--muted)">Ausgewertete Spiele</div></div>
+    <div class="stat-card"><div style="font-size:20px;margin-bottom:4px">🏆</div><div style="font-size:18px;font-weight:700;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${global[0]?esc(global[0].name):'—'}</div><div style="font-size:11px;color:var(--muted)">Aktuell führend</div></div>
   </div>
-  ${inactiveCount>0?`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ℹ️ ${inactiveCount} weitere Code(s) wurden generiert, aber noch nicht für einen Tipp verwendet — diese erscheinen erst nach dem ersten Tipp in der Liste.</div>`:''}
-  <div class="card">
-    <table class="table">
-      <thead><tr><th style="width:40px">#</th><th>Name</th><th style="text-align:right">Tipps abgegeben</th><th style="text-align:right">Punkte</th></tr></thead>
-      <tbody>${ranked.map((p,i)=>`<tr>
-        <td><span class="rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</span></td>
-        <td style="font-weight:500">${esc(p.name)}</td>
-        <td style="text-align:right;color:var(--muted)">${p.tipsCount}</td>
-        <td style="text-align:right;font-weight:700;color:var(--gold)">${p.pts}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-  </div>
-  <div style="font-size:12px;color:var(--muted);margin-top:8px">Punktesystem: ${t.tippingPoints?.exactResult??5} Pkt. exaktes Ergebnis · ${t.tippingPoints?.correctDiff??3} Pkt. richtige Differenz · ${t.tippingPoints?.correctTrend??2} Pkt. richtige Tendenz.</div>`;
+  ${inactive>0?`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ℹ️ ${inactive} Code(s) noch nicht verwendet.</div>`:''}
+  <h3 style="margin:18px 0 8px">🌍 Globale Rangliste</h3>
+  <div class="card"><table class="table">
+    <thead><tr><th style="width:40px">#</th><th>Name</th><th style="text-align:right">Punkte</th></tr></thead>
+    <tbody>${global.map((p,i)=>rankRow(p,i)).join('')}</tbody>
+  </table></div>`;
+  gNames.forEach(g=>{
+    const gl=byGroup[g];if(!gl||!gl.length)return;
+    html+=`<h3 style="margin:18px 0 8px">📊 ${esc(g)}</h3>
+    <div class="card"><table class="table">
+      <thead><tr><th style="width:40px">#</th><th>Name</th><th style="text-align:right">Punkte ${esc(g)}</th></tr></thead>
+      <tbody>${gl.map((p,i)=>rankRow(p,i,p.ptsByGroup?.[g]||0)).join('')}</tbody>
+    </table></div>`;
+  });
+  if(byKO.length){html+=`<h3 style="margin:18px 0 8px">⚡ K.O.-Phase</h3>
+    <div class="card"><table class="table">
+      <thead><tr><th style="width:40px">#</th><th>Name</th><th style="text-align:right">KO-Punkte</th></tr></thead>
+      <tbody>${byKO.map((p,i)=>rankRow(p,i,p.ptsByGroup?.__ko||0)).join('')}</tbody>
+    </table></div>`;}
+  html+=`<div style="font-size:12px;color:var(--muted);margin-top:10px">Gruppe: ${t.tippingPoints?.group?.exactResult??5}/${t.tippingPoints?.group?.correctDiff??3}/${t.tippingPoints?.group?.correctTrend??2} Pkt · KO: ${t.tippingPoints?.ko?.exactResult??7}/${t.tippingPoints?.ko?.correctDiff??5}/${t.tippingPoints?.ko?.correctTrend??3} Pkt</div>`;
+  el.innerHTML=html;
 }
+
+
 
 function renderTipLogin(){
   const tipDiv=document.getElementById('pt-tipping');
@@ -3180,7 +3246,7 @@ async function renderTipForm(){
     <div style="font-size:11px;font-weight:700;font-family:var(--font-display);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 8px">Abgeschlossene Spiele</div>
     ${closed.map(m=>{
       const tip=myTips[String(m.id)];
-      const tipR=tip?calcTipPoints(tip.home_goals,tip.away_goals,m.hg,m.ag,t.tippingPoints):{pts:0,category:'none'};
+      const tipR=tip?calcTipPoints(tip.home_goals,tip.away_goals,m.hg,m.ag,t.tippingPoints,m.isKO):{pts:0,category:'none'};
       const exact=tipR.category==='exact';
       const diffMatch=tipR.category==='diff';
       const trend=tipR.category==='trend';
