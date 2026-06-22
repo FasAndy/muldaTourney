@@ -2913,10 +2913,11 @@ function toggleTipInfo(colKey){
   const body=document.getElementById('tip-info-body-'+safeKey);
   const btn=document.getElementById('tip-info-toggle-'+safeKey);
   if(!body)return;
-  const collapsed=body.style.display==='none';
-  body.style.display=collapsed?'':'none';
-  if(btn)btn.textContent=collapsed?'−':'+';
-  try{localStorage.setItem(colKey,collapsed?'0':'1');}catch(e){}
+  const isNowCollapsed=body.style.display==='none';
+  // Toggle: if currently collapsed → expand; if expanded → collapse
+  body.style.display=isNowCollapsed?'block':'none';
+  if(btn)btn.textContent=isNowCollapsed?'−':'+';
+  try{localStorage.setItem(colKey,isNowCollapsed?'0':'1');}catch(e){}
 }
 
 function tipLogout(){
@@ -3230,7 +3231,7 @@ async function renderTipForm(){
     </div>
     ${(()=>{
       const colKey='tip_info_col_'+_tipSession.participant_id;
-      const isCol=localStorage.getItem(colKey)==='1';
+      const isCol=localStorage.getItem(colKey)!=='0'; // default: collapsed
       const gPts=t.tippingPoints?.group||t.tippingPoints||{exactResult:5,correctDiff:3,correctTrend:2};
       const kPts=t.tippingPoints?.ko||gPts;
       const hasKO=t.tippingEnabled&&t.koPhase;
