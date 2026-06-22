@@ -2904,7 +2904,9 @@ async function tipLogin(tournamentId){
     document.getElementById('tip-login-err').textContent='Ungültiger Code. Bitte prüfen.';
     return;
   }
-  const t=DB.tournaments.find(x=>x.id===tournamentId);
+  // Always pull fresh tournament from cloud to get correct tippingMode/settings
+  const fresh=await pullLatestTournament(tournamentId);
+  const t=fresh||DB.tournaments.find(x=>x.id===tournamentId);
   _tipSession={participant_id:data.id,name:data.name,tournament_id:tournamentId,chosen_group:data.chosen_group||null};
   // Modus B: if no group chosen yet, show group selection first
   if(t?.tippingMode==='B'&&!data.chosen_group){
