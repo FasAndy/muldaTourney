@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.36</title>
+<title>TourneyPro v0.38</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -247,7 +247,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.36</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.38</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -1749,31 +1749,47 @@ ${t.archived?`<div class="alert alert-amber">📦 Archiviert – schreibgeschüt
   ${(()=>{return Object.keys(t.groups).map((g,gi)=>{const c=GRP_COLORS[gi%GRP_COLORS.length];return`<div class="card" style="margin:0;border-left:3px solid ${c}"><div class="card-header"><h3 style="color:${c}">${esc(g)}</h3><span class="badge" style="background:${c}22;color:${c}">${t.groups[g].length}</span></div>${standingsHTML(t,g,true)}</div>`;}).join('');})()}
 </div>
 ${upcoming.length?`<div class="card"><div class="card-header"><h3>Nächste Spiele</h3></div>
-  <table class="table">
+  <table class="table" style="table-layout:fixed;width:100%">
+    <colgroup>
+        <col style="width:80px">
+        <col style="width:90px">
+        <col style="width:auto">
+        <col style="width:110px">
+        <col style="width:auto">
+        <col style="width:36px">
+      </colgroup>
     <thead><tr><th>Zeit</th><th>Gruppe</th><th>Heim</th><th style="text-align:center">Ergebnis</th><th>Gast</th><th></th></tr></thead>
     <tbody>${(()=>{const gKeys=Object.keys(t.groups);return upcoming.map(m=>{const gi=gKeys.indexOf(m.grp);const col=GRP_COLORS[gi%GRP_COLORS.length];return`<tr>
-      <td style="color:var(--muted);font-size:12px">${m.time||'—'}</td>
-      <td><span class="badge" style="background:${col}22;color:${col};font-size:10px">${esc(m.grp)}</span></td>
-      <td style="font-weight:500">${esc(m.home)}</td>
-      <td style="text-align:center">
-        <input class="score-inp" id="ov_h${m.id}" type="number" min="0" placeholder="" onfocus="focusScoreOv(this,${m.id})" oninput="chkOvBtn(${m.id})">
-        <span style="color:var(--muted);margin:0 3px">:</span>
-        <input class="score-inp" id="ov_a${m.id}" type="number" min="0" placeholder="" onfocus="focusScoreOv(this,${m.id})" oninput="chkOvBtn(${m.id})">
+      <td style="color:var(--muted);font-size:12px;white-space:nowrap">${m.time||'—'}</td>
+      <td><span class="badge" style="background:${col}22;color:${col};font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:88px">${esc(m.grp)}</span></td>
+      <td style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.home)}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <input class="score-inp" id="ov_h${m.id}" type="number" min="0" placeholder="" onfocus="focusScoreOv(this,${m.id})" oninput="chkOvBtn(${m.id})" style="width:38px">
+        <span style="color:var(--muted);margin:0 2px">:</span>
+        <input class="score-inp" id="ov_a${m.id}" type="number" min="0" placeholder="" onfocus="focusScoreOv(this,${m.id})" oninput="chkOvBtn(${m.id})" style="width:38px">
       </td>
-      <td style="font-weight:500">${esc(m.away)}</td>
+      <td style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.away)}</td>
       <td><button class="btn btn-sm btn-primary save-btn" id="ovbtn${m.id}" onclick="saveOvResult(${m.id})">✓</button></td>
     </tr>`;}).join('');})()}</tbody>
   </table></div>`:''}
 ${played?`<div class="card"><div class="card-header"><h3>Letzte Ergebnisse</h3></div>
-  <table class="table">
-    <thead><tr><th>Zeit</th><th>Gruppe</th><th>Heim</th><th style="text-align:center">Erg.</th><th>Gast</th><th></th></tr></thead>
+  <table class="table" style="table-layout:fixed;width:100%">
+    <colgroup>
+        <col style="width:80px">
+        <col style="width:90px">
+        <col style="width:auto">
+        <col style="width:110px">
+        <col style="width:auto">
+        <col style="width:80px">
+      </colgroup>
+    <thead><tr><th>Zeit</th><th>Gruppe</th><th>Heim</th><th style="text-align:center">Ergebnis</th><th>Gast</th><th></th></tr></thead>
     <tbody>${t.matches.filter(m=>m.played).slice(-6).reverse().map(m=>`<tr>
-      <td style="color:var(--muted);font-size:12px">${m.time||'—'}</td>
-      <td><span class="badge" style="font-size:10px;${grpColor(t,m.grp)}">${esc(m.grp)}</span></td>
-      <td style="font-weight:${m.hg>m.ag?600:400}">${esc(m.home)}</td>
-      <td style="text-align:center;font-weight:700">${m.hg} : ${m.ag}</td>
-      <td style="font-weight:${m.ag>m.hg?600:400}">${esc(m.away)}</td>
-      <td><span class="badge ${m.hg>m.ag?'badge-green':m.hg<m.ag?'badge-red':'badge-amber'}" style="font-size:10px">${m.hg>m.ag?'Heim':m.hg<m.ag?'Gast':'U'}</span></td>
+      <td style="color:var(--muted);font-size:12px;white-space:nowrap">${m.time||'—'}</td>
+      <td><span class="badge" style="font-size:10px;${grpColor(t,m.grp)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:88px">${esc(m.grp)}</span></td>
+      <td style="font-weight:${m.hg>m.ag?600:400};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.home)}</td>
+      <td style="text-align:center;font-weight:700;white-space:nowrap">${m.hg} : ${m.ag}</td>
+      <td style="font-weight:${m.ag>m.hg?600:400};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.away)}</td>
+      <td style="white-space:nowrap"><span class="badge ${m.hg>m.ag?'badge-green':m.hg<m.ag?'badge-red':'badge-amber'}" style="font-size:10px">${m.hg>m.ag?'Heim':m.hg<m.ag?'Gast':'U'}</span></td>
     </tr>`).join('')}</tbody>
   </table></div>`:''}`;
 },
@@ -2866,28 +2882,48 @@ function tipLogout(){
 
 async function submitTip(matchId){
   if(!_tipSession){return;}
-  const t=DB.tournaments.find(x=>x.id===_tipSession.tournament_id);
-  if(!t)return;
-  const m=t.matches.find(x=>x.id==matchId)||(t.bracket?.matches||[]).find(x=>x.id==matchId);
-  if(!m)return;
-  // Check if match is locked (played already = locked)
-  if(m.played||m.result){alert('Dieses Spiel ist bereits gesperrt.');return;}
+  // Validate inputs first (before any network call)
   const _hv=document.getElementById('tip_h_'+matchId)?.value.trim();
   const _av=document.getElementById('tip_a_'+matchId)?.value.trim();
   const h=_hv!==''?parseInt(_hv):NaN;
   const a=_av!==''?parseInt(_av):NaN;
   if(isNaN(h)||isNaN(a)||h<0||a<0||h>99||a>99){alert('Bitte gültigen Tipp eingeben (0–99)!');return;}
-  const {error}=await _sb.from('tip_picks').upsert({
-    participant_id: _tipSession.participant_id,
-    tournament_id: _tipSession.tournament_id,
-    match_id: String(matchId),
-    home_goals: h,
-    away_goals: a
-  },{onConflict:'participant_id,match_id'});
-  if(error){alert('Fehler beim Speichern: '+error.message);return;}
-  // Visual feedback
+  // Lock the button immediately to prevent double-submit
   const btn=document.getElementById('tip_btn_'+matchId);
-  if(btn){btn.textContent='✅';btn.disabled=true;setTimeout(()=>{btn.textContent='Tippen';btn.disabled=false;},1500);}
+  if(btn){btn.disabled=true;btn.textContent='⏳';}
+  // Always fetch fresh tournament data from cloud before checking match status
+  // This prevents submitting a tip for a match that was locked after this page loaded
+  try{
+    const fresh=await pullLatestTournament(_tipSession.tournament_id);
+    const t=fresh||DB.tournaments.find(x=>x.id===_tipSession.tournament_id);
+    if(!t){if(btn){btn.disabled=false;btn.textContent='Tippen';}return;}
+    const m=t.matches.find(x=>x.id==matchId)||(t.bracket?.matches||[]).find(x=>x.id==matchId);
+    if(!m){if(btn){btn.disabled=false;btn.textContent='Tippen';}return;}
+    // Server-side lock check with freshly loaded data
+    if(m.played||m.result){
+      alert('⛔ Dieses Spiel wurde inzwischen gestartet — der Tipp kann nicht mehr abgegeben werden.');
+      if(btn){btn.disabled=false;btn.textContent='Gesperrt 🔒';}
+      // Refresh the tip form so the match moves to "Abgeschlossen"
+      setTimeout(()=>renderTipForm(),300);
+      return;
+    }
+    const {error}=await _sb.from('tip_picks').upsert({
+      participant_id: _tipSession.participant_id,
+      tournament_id: _tipSession.tournament_id,
+      match_id: String(matchId),
+      home_goals: h,
+      away_goals: a
+    },{onConflict:'participant_id,match_id'});
+    if(error){
+      alert('Fehler beim Speichern: '+error.message);
+      if(btn){btn.disabled=false;btn.textContent='Tippen';}
+      return;
+    }
+    if(btn){btn.textContent='✅';setTimeout(()=>{btn.disabled=false;btn.textContent='Tipp aktualisieren';},1500);}
+  }catch(e){
+    alert('Netzwerkfehler: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Tippen';}
+  }
 }
 
 async function loadMyTips(tournamentId){
