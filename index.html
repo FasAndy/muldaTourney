@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.34</title>
+<title>TourneyPro v0.35</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -247,7 +247,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.34</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.35</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -2591,16 +2591,21 @@ function cancelNewTourney(){
   }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
   openHome();
-  // openHome() resets activeTournamentId to null (for the admin tournament-list view) —
-  // re-apply our resolved tournament afterwards so public/admin views still resolve T() correctly.
+  // openHome() resets activeTournamentId to null — re-apply our resolved tournament.
   if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
+
+  // Determine which page to restore from URL
+  const _urlParams=new URLSearchParams(window.location.search);
+  const _urlPage=_urlParams.get('page');
 
   // Admin access: only reachable via ?adminMode URL param + password
   if(checkAdminModeParam()){
     if(isAdminUnlocked()){
       setView('admin');
+      // Restore last visited admin page on refresh
+      if(_urlPage&&pages[_urlPage]) showPage(_urlPage);
     } else {
-      showAdminPasswordPrompt(); // password prompt shown over default public view; no buttons revealed
+      showAdminPasswordPrompt();
     }
   } else {
     setView('public');
@@ -2702,12 +2707,12 @@ function renderQRGrid(){
   const t=T();
   const baseUrl=window.location.origin+window.location.pathname;
   const tParam=t?.slug?('&t='+encodeURIComponent(t.slug)):'';
-  grid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+  grid.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
     ${_loadedTipCodes.map(p=>`
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:10px;text-align:center">
-      <div class="qr-box" id="qr-${p.id}" style="margin:0 auto 8px;width:fit-content"></div>
-      <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</div>
-      <div style="font-size:10px;color:var(--muted);letter-spacing:.05em">${esc(p.code)}</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center;overflow:visible">
+      <div class="qr-box" id="qr-${p.id}" style="margin:0 auto 10px;width:fit-content;overflow:visible;display:flex;justify-content:center"></div>
+      <div style="font-size:13px;font-weight:600;margin-top:4px">${esc(p.name)}</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:.06em;margin-top:2px">${esc(p.code)}</div>
     </div>`).join('')}
   </div>
   <div style="margin-top:14px;text-align:center">
@@ -3049,7 +3054,7 @@ function renderTipLogin(){
   tipDiv.innerHTML=`
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;margin-bottom:12px">
       <h3 style="margin-bottom:4px;font-family:var(--font-display);color:var(--gold)">🎯 Tippspiel</h3>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Gib deinen persönlichen Code ein um zu tippen.</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Gib deinen persönlichen Code ein um zu tippen. Deinen persönlichen Code erhältst du bei der Turnierleitung.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <input id="tip-code-inp" placeholder="z.B. ABC-DEF-GHI" style="max-width:220px;text-transform:uppercase;letter-spacing:.1em;font-size:14px;font-weight:600"
           onkeydown="if(event.key==='Enter')tipLogin('${t.id}')">
@@ -3334,16 +3339,21 @@ function deleteTourney(id){
   }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
   openHome();
-  // openHome() resets activeTournamentId to null (for the admin tournament-list view) —
-  // re-apply our resolved tournament afterwards so public/admin views still resolve T() correctly.
+  // openHome() resets activeTournamentId to null — re-apply our resolved tournament.
   if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
+
+  // Determine which page to restore from URL
+  const _urlParams=new URLSearchParams(window.location.search);
+  const _urlPage=_urlParams.get('page');
 
   // Admin access: only reachable via ?adminMode URL param + password
   if(checkAdminModeParam()){
     if(isAdminUnlocked()){
       setView('admin');
+      // Restore last visited admin page on refresh
+      if(_urlPage&&pages[_urlPage]) showPage(_urlPage);
     } else {
-      showAdminPasswordPrompt(); // password prompt shown over default public view; no buttons revealed
+      showAdminPasswordPrompt();
     }
   } else {
     setView('public');
@@ -3462,7 +3472,7 @@ function drawQR(container,url){
     const qr=qrcode(0,'M'); // type 0 = auto-detect size, M = medium error correction
     qr.addData(url);
     qr.make();
-    const cellSize=4, margin=8;
+    const cellSize=5, margin=10;
     const moduleCount=qr.getModuleCount();
     const size=moduleCount*cellSize+margin*2;
     let svg=`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
@@ -3494,6 +3504,15 @@ function showPage(p){
   const map={overview:0,settings:1,teams:2,groups:3,schedule:4,standings:5,bracket:6,custom_bracket:7,qr:8,tipping_ranking:9};
   const items=document.querySelectorAll('#sb-t-nav .nav-item');
   if(items[map[p]])items[map[p]].classList.add('active');
+  // Update URL to reflect current page (enables refresh to same page)
+  try{
+    const slug=t?.slug;
+    const params=new URLSearchParams(window.location.search);
+    if(slug)params.set('t',slug);
+    if(checkAdminModeParam())params.set('adminMode','');
+    params.set('page',p);
+    history.replaceState(null,'',window.location.pathname+'?'+params.toString());
+  }catch(e){}
   renderMain(pages[p]?pages[p]():'<p style="padding:20px;color:var(--muted)">Nicht gefunden</p>');
   if(p==='qr')setTimeout(()=>{const t=T();if(t)updateQR(t.slug);},60);
   if(p==='tipping_ranking')setTimeout(()=>{const t=T();if(t&&t.tippingEnabled)loadAdminRanking();},60);
@@ -4019,16 +4038,21 @@ async function initApp(){
   }catch(e){ console.warn('Cloud restore failed, using local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
   openHome();
-  // openHome() resets activeTournamentId to null (for the admin tournament-list view) —
-  // re-apply our resolved tournament afterwards so public/admin views still resolve T() correctly.
+  // openHome() resets activeTournamentId to null — re-apply our resolved tournament.
   if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
+
+  // Determine which page to restore from URL
+  const _urlParams=new URLSearchParams(window.location.search);
+  const _urlPage=_urlParams.get('page');
 
   // Admin access: only reachable via ?adminMode URL param + password
   if(checkAdminModeParam()){
     if(isAdminUnlocked()){
       setView('admin');
+      // Restore last visited admin page on refresh
+      if(_urlPage&&pages[_urlPage]) showPage(_urlPage);
     } else {
-      showAdminPasswordPrompt(); // password prompt shown over default public view; no buttons revealed
+      showAdminPasswordPrompt();
     }
   } else {
     setView('public');
