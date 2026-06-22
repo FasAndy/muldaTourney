@@ -2890,6 +2890,7 @@ async function deleteTipCode(id){
 
 // ── Public tipping: session state ─────────────────────────────────────
 let _tipSession = null; // {participant_id, name, tournament_id}
+let _tipInfoExpanded = {}; // {participantId: true/false} — true=expanded
 
 async function tipLogin(tournamentId){
   const code=(document.getElementById('tip-code-inp')?.value||'').trim().toUpperCase();
@@ -2917,7 +2918,8 @@ function toggleTipInfo(colKey){
   // Toggle: if currently collapsed → expand; if expanded → collapse
   body.style.display=isNowCollapsed?'block':'none';
   if(btn)btn.textContent=isNowCollapsed?'−':'+';
-  try{localStorage.setItem(colKey,isNowCollapsed?'0':'1');}catch(e){}
+  if(!_tipSession)return;
+  _tipInfoExpanded[_tipSession.participant_id]=isNowCollapsed;
 }
 
 function tipLogout(){
@@ -3231,7 +3233,7 @@ async function renderTipForm(){
     </div>
     ${(()=>{
       const colKey='tip_info_col_'+_tipSession.participant_id;
-      const isCol=localStorage.getItem(colKey)!=='0'; // default: collapsed
+      const isCol=!_tipInfoExpanded[_tipSession?.participant_id]; // default: collapsed
       const gPts=t.tippingPoints?.group||t.tippingPoints||{exactResult:5,correctDiff:3,correctTrend:2};
       const kPts=t.tippingPoints?.ko||gPts;
       const hasKO=t.tippingEnabled&&t.koPhase;
@@ -3240,7 +3242,7 @@ async function renderTipForm(){
           <span style="font-size:12px;font-weight:600;font-family:var(--font-display);letter-spacing:.04em;color:var(--muted);text-transform:uppercase">ℹ️ Punkteschlüssel</span>
           <span id="tip-info-toggle-${colKey.replace(/[^a-z0-9]/gi,'_')}" style="font-size:14px;color:var(--muted);line-height:1">${isCol?'+':'−'}</span>
         </div>
-        <div id="tip-info-body-${colKey.replace(/[^a-z0-9]/gi,'_')}" style="${isCol?'display:none':''}padding:0 12px 12px">
+        <div id="tip-info-body-${colKey.replace(/[^a-z0-9]/gi,'_')}" style="${isCol?'display:none;':''}padding:0 12px 12px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
             <span style="background:var(--green-bg);color:var(--green);font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px">✅ Exaktes Ergebnis: ${gPts.exactResult??5} Pkt</span>
             <span style="background:rgba(96,165,250,.12);color:#60a5fa;font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px">🎯 Richtige Differenz: ${gPts.correctDiff??3} Pkt</span>
