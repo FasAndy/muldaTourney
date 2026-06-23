@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.41</title>
+<title>TourneyPro v0.42</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -247,7 +247,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.41</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.42</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -285,6 +285,7 @@ select option{background:var(--bg3);color:var(--text)}
       <div style="font-size:11px;color:var(--muted)" id="pub-sub">—</div>
     </div>
     <div class="pub-live" id="pub-live-badge" style="display:none"><span class="ld"></span>Live</div>
+    <button id="pub-fav-btn" onclick="showFavPickerPublic()" style="background:none;border:1px solid var(--border);border-radius:var(--r);padding:4px 10px;cursor:pointer;font-size:12px;color:var(--muted);font-family:var(--font-display);font-weight:600;letter-spacing:.04em;display:none">⭐ Favorit</button>
   </div>
   <div class="pub-content">
     <div class="pub-tabs">
@@ -470,7 +471,7 @@ function standingsHTML(t,gName,compact=false){
     <thead><tr><th class="col-rank">#</th><th class="col-name">Team</th><th class="col-stat">Sp</th><th class="col-stat">S</th><th class="col-stat">U</th><th class="col-stat">N</th><th class="col-goals">Tore</th><th class="col-stat">Td</th><th class="col-stat">Pkt</th></tr></thead>
     <tbody>${rows.map((r,i)=>`<tr>
       <td class="col-rank"><span class="rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</span></td>
-      <td class="col-name" style="font-weight:500${i<ac?';color:var(--accent)':''}">
+      <td class="col-name" style="font-weight:${isFav(r.t)?700:500};color:${isFav(r.t)?'var(--gold)':i<ac?'var(--accent)':'inherit'}${i<ac?';font-weight:600':''}">
         ${esc(r.t)}${i<ac?`<span style="font-size:9px;color:var(--accent);margin-left:3px">↑</span>`:''}
       </td>
       <td class="col-stat">${r.p}</td><td class="col-stat">${r.w}</td><td class="col-stat">${r.d}</td><td class="col-stat">${r.l}</td>
@@ -2623,6 +2624,7 @@ function cancelNewTourney(){
     if(!resolved) DB.tournaments=[];
   }catch(e){ console.warn('Cloud restore failed, keeping local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
+  loadFavTeam();
   openHome();
   // openHome() resets activeTournamentId to null — re-apply our resolved tournament.
   if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
@@ -3323,7 +3325,7 @@ async function renderTipForm(){
           ${m.time?`<span style="font-size:11px;color:var(--muted)">⏰ ${esc(m.time)}</span>`:''}
         </div>
         <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-weight:500;font-size:13px">${esc(m.home)}</span>
+          <span style="font-weight:${isFav(m.home)?'700':'500'};font-size:13px;color:${isFav(m.home)?'var(--gold)':'inherit'}">${esc(m.home)}</span>
           <div style="display:flex;align-items:center;gap:4px">
             <input class="score-inp" id="tip_h_${m.id}" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
               value="${tip!==undefined?tip.home_goals:''}" placeholder="–"
@@ -3337,7 +3339,7 @@ async function renderTipForm(){
               onfocus="if(this.value==='0')this.select()"
               oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,2)">
           </div>
-          <span style="font-weight:500;font-size:13px;text-align:right">${esc(m.away)}</span>
+          <span style="font-weight:${isFav(m.away)?'700':'500'};font-size:13px;text-align:right;color:${isFav(m.away)?'var(--gold)':'inherit'}">${esc(m.away)}</span>
         </div>
         <button id="tip_btn_${m.id}" class="btn btn-primary btn-sm" style="width:100%" onclick="submitTip('${m.id}')">
           ${tip?'✅ Tipp aktualisieren':'Tippen'}
@@ -3360,12 +3362,12 @@ async function renderTipForm(){
           ${tip?`<span style="font-size:11px;font-weight:700;color:${exact?'var(--green)':diffMatch?'#60a5fa':trend?'var(--gold)':'var(--red)'}">+${pts} Pkt</span>`:'<span style="font-size:11px;color:var(--muted)">Kein Tipp</span>'}
         </div>
         <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px">
-          <span style="font-size:13px">${esc(m.home)}</span>
+          <span style="font-size:13px;${isFav(m.home)?'font-weight:700;color:var(--gold)':''}">${esc(m.home)}</span>
           <div style="text-align:center">
             <div style="font-weight:700;font-size:14px">${m.hg} : ${m.ag}</div>
             ${tip?`<div style="font-size:10px;color:var(--muted)">Tipp: ${tip.home_goals}:${tip.away_goals}</div>`:''}
           </div>
-          <span style="font-size:13px;text-align:right">${esc(m.away)}</span>
+          <span style="font-size:13px;text-align:right;${isFav(m.away)?'font-weight:700;color:var(--gold)':''}">${esc(m.away)}</span>
         </div>
       </div>`;
     }).join('')}`:''}
@@ -3734,6 +3736,58 @@ function setView(v){
 // PUBLIC VIEW
 // ═══════════════════════════════════════════════════════════════════════
 let _pubSort='chrono';
+
+// ═══════════════════════════════════════════════════════════════════════
+// FAVORITE TEAM
+// ═══════════════════════════════════════════════════════════════════════
+let _favTeam = null;
+
+function loadFavTeam(){
+  try{ _favTeam=localStorage.getItem('tp_fav_team')||null; }catch(e){}
+}
+function saveFavTeam(team){
+  _favTeam=team;
+  try{
+    if(team) localStorage.setItem('tp_fav_team',team);
+    else localStorage.removeItem('tp_fav_team');
+  }catch(e){}
+}
+function isFav(teamName){
+  return _favTeam&&teamName&&teamName===_favTeam;
+}
+function favStyle(teamName){
+  // Returns extra inline style for favorite team names
+  return isFav(teamName)?'font-weight:700;color:var(--gold)':'';
+}
+
+function showFavPickerPublic(){
+  const t=T()||DB.tournaments.find(x=>!x.archived)||DB.tournaments[0];
+  if(t) showFavPicker(t);
+}
+function showFavPicker(t){
+  // Show a modal to pick favorite team
+  const teams=[...t.teams].sort();
+  const modal=document.createElement('div');
+  modal.id='fav-picker-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;width:100%;max-width:360px;max-height:80vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="margin:0;color:var(--gold)">⭐ Favoriten-Team</h3>
+      <button onclick="document.getElementById('fav-picker-modal').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      ${_favTeam?`<button onclick="saveFavTeam(null);document.getElementById('fav-picker-modal').remove();renderPublic()" style="width:100%;text-align:left;padding:10px 12px;border:1px solid var(--red-dim);border-radius:var(--r);background:var(--red-bg);color:var(--red);cursor:pointer;margin-bottom:8px;font-size:13px">✕ Favorit entfernen</button>`:''}
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${teams.map(tm=>`<button onclick="saveFavTeam('${esc(tm).replace(/'/g,"\'")}');document.getElementById('fav-picker-modal').remove();renderPublic()"
+          style="width:100%;text-align:left;padding:10px 12px;border:1px solid ${isFav(tm)?'var(--gold)':'var(--border)'};border-radius:var(--r);background:${isFav(tm)?'var(--gold-dim)':'var(--bg3)'};color:${isFav(tm)?'var(--gold)':'var(--text)'};cursor:pointer;font-size:13px;font-weight:${isFav(tm)?'700':'400'}">
+          ${isFav(tm)?'⭐ ':''}${esc(tm)}
+        </button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
 async function renderPublic(){
   let t=T()||DB.tournaments.find(x=>!x.archived);
   if(!t){
@@ -3779,6 +3833,14 @@ async function renderPublic(){
   // Show/hide tipping tab
   const tipTab=document.getElementById('pub-tab-tipping');
   if(tipTab)tipTab.style.display=t.tippingEnabled?'':'none';
+  // Show fav button and update label
+  const favBtn=document.getElementById('pub-fav-btn');
+  if(favBtn){
+    favBtn.style.display='';
+    favBtn.innerHTML=_favTeam?`⭐ ${esc(_favTeam)}`:'⭐ Favorit wählen';
+    favBtn.style.color=_favTeam?'var(--gold)':'var(--muted)';
+    favBtn.style.borderColor=_favTeam?'var(--gold)':'var(--border)';
+  }
   // Standings - sync widths across all groups + group colors
   {
     const allTeams=Object.values(t.groups).flat();
@@ -3799,7 +3861,7 @@ async function renderPublic(){
           const adv=i<ac;
           return '<tr>'
             +'<td style="padding:6px 5px;border-bottom:1px solid var(--border)"><span class="rank '+(i===0?'r1':i===1?'r2':'')+'">'+(i+1)+'</span></td>'
-            +'<td style="padding:6px 5px;border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;'+(adv?'color:var(--accent)':'')+'">'+esc(r.t)+(adv?'<span style="font-size:9px;margin-left:3px">↑</span>':'')+'</td>'
+            +'<td style="padding:6px 5px;border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:'+((_favTeam&&r.t===_favTeam)?'700':'500')+';color:'+((_favTeam&&r.t===_favTeam)?'var(--gold)':(adv?'var(--accent)':'inherit'))+';">'+esc(r.t)+(adv?'<span style="font-size:9px;margin-left:3px">↑</span>':'')+'</td>'
             +'<td style="padding:6px 5px;border-bottom:1px solid var(--border);text-align:right;color:var(--muted)">'+r.p+'</td>'
             +'<td style="padding:6px 5px;border-bottom:1px solid var(--border);text-align:right;font-weight:700;color:var(--accent)">'+r.pts+'</td>'
             +'<td style="padding:6px 5px;border-bottom:1px solid var(--border);text-align:right;color:var(--muted)">'+r.gf+':'+r.ga+'</td>'
@@ -3838,9 +3900,9 @@ function renderPubSchedule(t){
         </div>
       </div>
       <div style="display:flex;align-items:center;font-size:${isNext?15:13}px">
-        <span style="flex:1;font-weight:${pl&&m.hg>m.ag?700:500};color:${pl&&m.hg>m.ag?'var(--accent)':'var(--text)'}">${esc(m.home)}</span>
+        <span style="flex:1;font-weight:${isFav(m.home)?700:pl&&m.hg>m.ag?700:500};color:${isFav(m.home)?'var(--gold)':pl&&m.hg>m.ag?'var(--accent)':'var(--text)'}">${esc(m.home)}</span>
         <span style="font-weight:700;font-size:${isNext?17:14}px;min-width:54px;text-align:center;color:${pl?'var(--text)':'var(--subtle)'}">${pl?m.hg+' : '+m.ag:'– : –'}</span>
-        <span style="flex:1;text-align:right;font-weight:${pl&&m.ag>m.hg?700:500};color:${pl&&m.ag>m.hg?'var(--accent)':'var(--text)'}">${esc(m.away)}</span>
+        <span style="flex:1;text-align:right;font-weight:${isFav(m.away)?700:pl&&m.ag>m.hg?700:500};color:${isFav(m.away)?'var(--gold)':pl&&m.ag>m.hg?'var(--accent)':'var(--text)'}">${esc(m.away)}</span>
       </div>
       ${pl?'<div style="margin-top:7px;text-align:center"><span class="badge badge-green" style="font-size:10px">✅ Abgeschlossen</span></div>':''}
     </div>`;
@@ -3857,16 +3919,22 @@ function renderPubSchedule(t){
   const showPlayed=F==='all'?playedList.slice(-3):playedList;
   const hiddenCnt=F==='all'?Math.max(0,playedList.length-3):0;
   // Build filter bar using data-filter attributes + global click
+  const hasFav=!!_favTeam;
   const bars=[
-    ['all','Alle',F==='all'],['upcoming','Ausstehend',F==='upcoming'],['played','Abgeschlossen',F==='played']
+    ['all','Alle',F==='all'],['upcoming','Ausstehend',F==='upcoming'],['played','Abgeschlossen',F==='played'],
+    ...(hasFav?[['fav','⭐ '+(_favTeam||''),F==='fav']]:[] )
   ].map(([v,l,a])=>`<button class="btn btn-sm${a?' btn-primary':''}" data-psf="${v}">${l}</button>`).join('');
   const sortBars=[['chrono','⏰',SM==='chrono'],['group','⬡',SM==='group']]
     .map(([v,l,a])=>`<button class="btn btn-sm${a?' btn-primary':''}" data-pss="${v}" title="${v==='chrono'?'Chronologisch':'Nach Gruppe'}">${l}</button>`).join('');
   let html=`<div style="display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap" id="pub-sched-bar">${bars}<span style="flex:1"></span>${sortBars}</div>`;
-  if(F!=='played') upcomingList.forEach(m=>{ html+=matchCard(m,m===nextMatch&&F==='all'); });
+  const favFilter=(m)=>!_favTeam||(m.home===_favTeam||m.away===_favTeam);
+  const upcomingShow=F==='fav'?upcomingList.filter(favFilter):upcomingList;
+  const playedShow=F==='fav'?[...showPlayed].filter(favFilter):[...showPlayed];
+  if(F!=='played'&&F!=='fav') upcomingList.forEach(m=>{ html+=matchCard(m,m===nextMatch&&F==='all'); });
+  if(F==='fav') upcomingShow.forEach(m=>{ html+=matchCard(m,false); });
   if(F!=='upcoming'){
-    if(hiddenCnt>0) html+=`<div style="text-align:center;margin:8px 0"><button class="btn btn-sm btn-ghost" data-psf="played">+ ${hiddenCnt} weitere</button></div>`;
-    [...showPlayed].reverse().forEach(m=>{ html+=matchCard(m,false); });
+    if(F!=='fav'&&hiddenCnt>0) html+=`<div style="text-align:center;margin:8px 0"><button class="btn btn-sm btn-ghost" data-psf="played">+ ${hiddenCnt} weitere</button></div>`;
+    (F==='fav'?playedShow.reverse():playedShow.reverse()).forEach(m=>{ html+=matchCard(m,false); });
   }
   if(!html.includes('match-card')) html+='<p style="color:var(--muted);padding:10px">Keine Spiele.</p>';
   const el=document.getElementById('pt-schedule');
@@ -3913,6 +3981,7 @@ function renderPubBracket(t){
     +'<button class="btn btn-sm '+(F==='all'?'btn-primary':'')+'" data-pkf="all">Alle</button>'
     +'<button class="btn btn-sm '+(F==='upcoming'?'btn-primary':'')+'" data-pkf="upcoming">Ausstehend</button>'
     +'<button class="btn btn-sm '+(F==='played'?'btn-primary':'')+'" data-pkf="played">Abgeschlossen</button>'
+    +(_favTeam?'<button class="btn btn-sm '+(F==='fav'?'btn-primary':'')+'" data-pkf="fav">⭐ '+esc(_favTeam)+'</button>':'')
     +'</div>';
   const byTimeKO=(a,b)=>{
     const ta=timeToMin(a.time), tb=timeToMin(b.time);
@@ -3937,9 +4006,9 @@ function renderPubBracket(t){
         ${m.time?`<span style="font-size:11px;color:var(--muted)">⏰ ${esc(m.time)}</span>`:''}
       </div>
       <div style="display:grid;grid-template-columns:1fr 54px 1fr;align-items:center;gap:4px;font-size:13px">
-        <span style="font-weight:${homeWins?'700':'500'};color:${homeWins?'var(--accent)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(homeTeam)}</span>
+        <span style="font-weight:${isFav(homeTeam)||homeWins?'700':'500'};color:${isFav(homeTeam)?'var(--gold)':homeWins?'var(--accent)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(homeTeam)}</span>
         <span style="font-weight:700;text-align:center;color:${pl?'var(--text)':'var(--subtle)'}">${pl?Math.floor(res.hg)+' : '+Math.floor(res.ag):'– : –'}</span>
-        <span style="font-weight:${awayWins?'700':'500'};color:${awayWins?'var(--accent)':'var(--text)'};text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(awayTeam)}</span>
+        <span style="font-weight:${isFav(awayTeam)||awayWins?'700':'500'};color:${isFav(awayTeam)?'var(--gold)':awayWins?'var(--accent)':'var(--text)'};text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(awayTeam)}</span>
       </div>
       ${res?.comment?`<div style="font-size:10px;color:var(--muted);font-style:italic;text-align:center;margin-top:4px">💬 ${esc(res.comment)}</div>`:''}
       ${pl?'<div style="margin-top:7px;text-align:center"><span class="badge badge-green" style="font-size:10px">✅ '+esc(winner||'—')+'</span></div>':''}
@@ -3965,15 +4034,19 @@ function renderPubBracket(t){
         ${m.time?`<span style="font-size:11px;color:var(--muted)">⏰ ${esc(m.time)}</span>`:''}
       </div>
       <div style="display:grid;grid-template-columns:1fr 54px 1fr;align-items:center;gap:4px;font-size:13px">
-        <span style="font-weight:${homeWins?'700':'500'};color:${homeWins?'var(--accent)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(homeTeam)}</span>
+        <span style="font-weight:${isFav(homeTeam)||homeWins?'700':'500'};color:${isFav(homeTeam)?'var(--gold)':homeWins?'var(--accent)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(homeTeam)}</span>
         <span style="font-weight:700;text-align:center;color:${pl?'var(--text)':'var(--subtle)'}">${pl?Math.floor(res.hg)+' : '+Math.floor(res.ag):'– : –'}${res?.tiebreak?'<br><span style="font-size:9px;color:var(--muted)">i.E.</span>':''}</span>
-        <span style="font-weight:${awayWins?'700':'500'};color:${awayWins?'var(--accent)':'var(--text)'};text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(awayTeam)}</span>
+        <span style="font-weight:${isFav(awayTeam)||awayWins?'700':'500'};color:${isFav(awayTeam)?'var(--gold)':awayWins?'var(--accent)':'var(--text)'};text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(awayTeam)}</span>
       </div></div>`;
     };
 
     // Filter by tab
-    const upcomingFiltered=F==='played'?[]:upcoming;
-    const playedFiltered=F==='upcoming'?[]:played;
+    const koFavFilter=(m)=>!_favTeam||(
+      (bracketSlotTeam(t,m.homeSlot)||bracketSlotLabel(m.homeSlot,t))===_favTeam||
+      (bracketSlotTeam(t,m.awaySlot)||bracketSlotLabel(m.awaySlot,t))===_favTeam
+    );
+    const upcomingFiltered=F==='played'?[]:F==='fav'?upcoming.filter(koFavFilter):upcoming;
+    const playedFiltered=F==='upcoming'?[]:F==='fav'?played.filter(koFavFilter):played;
 
     el.innerHTML=filterBar
       +(fw?`<div style="text-align:center;padding:20px 14px;background:var(--card);border-radius:var(--r-lg);border:2px solid var(--amber-dim);margin-bottom:10px">
@@ -4291,6 +4364,7 @@ async function initApp(){
     if(!resolved) DB.tournaments=[];
   }catch(e){ console.warn('Cloud restore failed, keeping local demo data:',e); _resolvedTournamentId=null; }
   _cloudLoaded=true;
+  loadFavTeam();
   openHome();
   // openHome() resets activeTournamentId to null — re-apply our resolved tournament.
   if(_resolvedTournamentId) DB.activeTournamentId=_resolvedTournamentId;
