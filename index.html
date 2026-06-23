@@ -284,7 +284,7 @@ select option{background:var(--bg3);color:var(--text)}
       <div style="font-size:15px;font-weight:700" id="pub-title">TourneyPro</div>
       <div style="font-size:11px;color:var(--muted)" id="pub-sub">—</div>
     </div>
-    <div class="pub-live"><span class="ld"></span>Live</div>
+    <div class="pub-live" id="pub-live-badge" style="display:none"><span class="ld"></span>Live</div>
   </div>
   <div class="pub-content">
     <div class="pub-tabs">
@@ -3522,10 +3522,26 @@ function openHome(){
   document.getElementById('sb-footer-name').textContent='Kein Turnier';
   renderMain(pages.home());
 }
-function archiveTourney(id){const t=DB.tournaments.find(x=>x.id===id);if(t){t.archived=true;renderMain(pages.home());}}
-function unarchiveTourney(id){const t=DB.tournaments.find(x=>x.id===id);if(t){t.archived=false;renderMain(pages.home());}}
-function deleteTourney(id){
-  if(!confirm('Turnier wirklich löschen?'))return;
+async function archiveTourney(id){
+  const t=DB.tournaments.find(x=>x.id===id);if(!t)return;
+  t.archived=true;
+  await syncActiveTournamentById(id);
+  renderMain(pages.home());
+}
+async function unarchiveTourney(id){
+  const t=DB.tournaments.find(x=>x.id===id);if(!t)return;
+  t.archived=false;
+  await syncActiveTournamentById(id);
+  renderMain(pages.home());
+}
+async function syncActiveTournamentById(id){
+  const t=DB.tournaments.find(x=>x.id===id);if(!t)return;
+  await _sb.from('tournaments_sync').upsert({id:t.id,data:t,updated_at:new Date().toISOString()},{onConflict:'id'});
+}
+async function deleteTourney(id){
+  if(!confirm('Turnier wirklich löschen? Der Eintrag wird auch aus der Cloud entfernt.'))return;
+  // Remove from Supabase so public devices no longer see it
+  await _sb.from('tournaments_sync').delete().eq('id',id);
   DB.tournaments=DB.tournaments.filter(t=>t.id!==id);
   if(DB.activeTournamentId===id){DB.activeTournamentId=null;async function initApp(){
   // Tournament resolution priority:
@@ -3773,6 +3789,13 @@ async function renderPublic(){
   document.getElementById('pub-title').textContent=t.name;
   document.getElementById('pub-sub').textContent=t.sport+' · '+t.phase;
   document.getElementById('pub-logo').innerHTML=t.logo?`<img src="${t.logo}" style="width:100%;height:100%;object-fit:cover">`:sportIcon(t.sport);
+  // Live badge: show only when ≥1 result entered AND not archived/finished/deleted
+  const liveBadge=document.getElementById('pub-live-badge');
+  if(liveBadge){
+    const hasResults=t.matches.some(m=>m.played)||(t.bracket?.matches||[]).some(m=>m.result);
+    const isOver=t.archived||!!t.winner;
+    liveBadge.style.display=(hasResults&&!isOver)?'flex':'none';
+  }
   // Show/hide tipping tab
   const tipTab=document.getElementById('pub-tab-tipping');
   if(tipTab)tipTab.style.display=t.tippingEnabled?'':'none';
