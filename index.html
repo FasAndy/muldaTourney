@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>TourneyPro v0.40</title>
+<title>TourneyPro v0.41</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* FC Muldakicker — Club Colours (dark mode) */
@@ -247,7 +247,7 @@ select option{background:var(--bg3);color:var(--text)}
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
-      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.40</div></div>
+      <div><div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)">TourneyPro</div><div style="font-size:10px;color:var(--muted)">v0.41</div></div>
     </div>
     <div class="sb-sec">Navigation</div>
     <button class="nav-item active" id="nav-home" onclick="openHome()"><span class="ic">🏠</span>Alle Turniere</button>
@@ -3772,7 +3772,8 @@ async function renderPublic(){
   const liveBadge=document.getElementById('pub-live-badge');
   if(liveBadge){
     const hasResults=t.matches.some(m=>m.played)||(t.bracket?.matches||[]).some(m=>m.result);
-    const isOver=t.archived||!!t.winner;
+    const bracketWinnerExists=!!(t.bracket?.matches&&bracketWinner(t,t.bracket.matches.find(m=>m.round===Math.max(...t.bracket.matches.map(x=>x.round))&&!m.disabled)?.id||''));
+    const isOver=t.archived||!!t.winner||bracketWinnerExists;
     liveBadge.style.display=(hasResults&&!isOver)?'flex':'none';
   }
   // Show/hide tipping tab
@@ -3946,7 +3947,42 @@ function renderPubBracket(t){
   }).join('');
   const el=document.getElementById('pt-bracket');
   if(el){
-    el.innerHTML=filterBar+allKOCards+(fw?`<div style="text-align:center;padding:14px;background:var(--card);border-radius:var(--r-lg);border:1px solid var(--amber-dim);margin-top:8px"><div style="font-size:28px">🏆</div><div style="font-weight:700;color:var(--amber);margin-top:4px">${esc(fw)}</div><div style="font-size:11px;color:var(--muted)">Turniersieger</div></div>`:'');
+    // Split into upcoming (asc) and played (desc)
+    const allMatches=(br?.matches||[]).filter(m=>!m.disabled&&m.awaySlot?.type!=='bye');
+    const upcoming=allMatches.filter(m=>!m.result).sort(byTimeKO);
+    const played=allMatches.filter(m=>!!m.result).sort((a,b)=>byTimeKO(b,a)); // descending
+
+    const buildCard=(m)=>{
+      const res=m.result;
+      const pl=!!res;
+      const homeTeam=bracketSlotTeam(t,m.homeSlot)||bracketSlotLabel(m.homeSlot,t);
+      const awayTeam=bracketSlotTeam(t,m.awaySlot)||bracketSlotLabel(m.awaySlot,t);
+      const homeWins=pl&&(res.tiebreak==='h'||(!res.tiebreak&&Math.floor(res.hg||0)>Math.floor(res.ag||0)));
+      const awayWins=pl&&(res.tiebreak==='a'||(!res.tiebreak&&Math.floor(res.ag||0)>Math.floor(res.hg||0)));
+      return`<div class="match-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+        <span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-dim);padding:2px 8px;border-radius:10px">${esc(m.label)}</span>
+        ${m.time?`<span style="font-size:11px;color:var(--muted)">⏰ ${esc(m.time)}</span>`:''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 54px 1fr;align-items:center;gap:4px;font-size:13px">
+        <span style="font-weight:${homeWins?'700':'500'};color:${homeWins?'var(--accent)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(homeTeam)}</span>
+        <span style="font-weight:700;text-align:center;color:${pl?'var(--text)':'var(--subtle)'}">${pl?Math.floor(res.hg)+' : '+Math.floor(res.ag):'– : –'}${res?.tiebreak?'<br><span style="font-size:9px;color:var(--muted)">i.E.</span>':''}</span>
+        <span style="font-weight:${awayWins?'700':'500'};color:${awayWins?'var(--accent)':'var(--text)'};text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(awayTeam)}</span>
+      </div></div>`;
+    };
+
+    // Filter by tab
+    const upcomingFiltered=F==='played'?[]:upcoming;
+    const playedFiltered=F==='upcoming'?[]:played;
+
+    el.innerHTML=filterBar
+      +(fw?`<div style="text-align:center;padding:20px 14px;background:var(--card);border-radius:var(--r-lg);border:2px solid var(--amber-dim);margin-bottom:10px">
+          <div style="font-size:32px;margin-bottom:6px">🏆</div>
+          <div style="font-weight:700;font-size:16px;color:var(--amber);margin-bottom:2px">${esc(fw)}</div>
+          <div style="font-size:11px;color:var(--muted);font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em">Turniersieger</div>
+        </div>`:'')
+      +upcomingFiltered.map(buildCard).join('')
+      +playedFiltered.map(buildCard).join('');
     el.querySelectorAll('[data-pkf]').forEach(b=>b.addEventListener('click',()=>{window._pubKOFilter=b.dataset.pkf;renderPubBracket(t);}));
   }
 }
