@@ -240,12 +240,12 @@ select option{background:var(--bg3);color:var(--text)}
 <div class="view-toggle">
   <span id="sync-indicator" style="font-size:11px;color:var(--green);opacity:0;transition:opacity .3s;align-self:center;margin-right:4px;font-family:var(--font-display);font-weight:600"></span>
   <button class="vbtn active" id="vbtn-admin" onclick="setView('admin')" style="display:none">⚙ Admin</button>
-  <button class="vbtn" id="vbtn-public" onclick="setView('public')" style="display:none">📱 Public</button>
   
 </div>
 
 <!-- ADMIN -->
 <div id="admin-view" class="app" style="display:none">
+  <button id="vbtn-public" onclick="setView('public')" style="display:none;position:fixed;bottom:24px;right:20px;z-index:300;background:var(--accent);color:#fff;border:none;border-radius:24px;padding:11px 18px;font-family:var(--font-display);font-weight:700;font-size:13px;letter-spacing:.04em;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4)">📱 Public</button>
   <div class="sidebar">
     <div class="sb-header">
       <div class="sb-logo" id="sl-logo">🏆</div>
@@ -285,8 +285,8 @@ select option{background:var(--bg3);color:var(--text)}
     <div class="pub-logo" id="pub-logo">🏆</div>
     <div style="flex:1;min-width:0">
       <div style="font-size:15px;font-weight:700" id="pub-title">WAMPN</div>
-      <div style="font-size:11px;color:var(--muted)" id="pub-sub">—</div>
-      <div style="font-size:10px;color:rgba(245,246,248,.22);margin-top:5px;letter-spacing:.06em;font-family:var(--font-body)">Powered by WAMPN</div>
+      <div style="font-size:10px;color:rgba(245,246,248,.3);letter-spacing:.06em;font-family:var(--font-body)" id="pub-sub">Powered by WAMPN</div>
+
     </div>
     <div class="pub-live" id="pub-live-badge" style="display:none"><span class="ld"></span>Live</div>
     <button id="pub-fav-btn" onclick="showFavPickerPublic()" style="background:none;border:1px solid var(--border);border-radius:var(--r);padding:4px 10px;cursor:pointer;font-size:12px;color:var(--muted);font-family:var(--font-display);font-weight:600;letter-spacing:.04em;display:none;align-self:flex-start">❤️ Favorit</button>
@@ -3852,7 +3852,7 @@ async function renderPublic(){
   let t=_rpT;
   if(!t){
     document.getElementById('pub-title').textContent='Kein aktives Turnier';
-    document.getElementById('pub-sub').textContent='Das Turnier wurde beendet oder ist noch nicht gestartet.';
+    document.getElementById('pub-sub').textContent='Powered by WAMPN';
     document.getElementById('pub-logo').innerHTML='🏁';
     const lb=document.getElementById('pub-live-badge');if(lb)lb.style.display='none';
     ['pt-standings','pt-schedule','pt-bracket','pt-tipping'].forEach(id=>{
@@ -3868,7 +3868,7 @@ async function renderPublic(){
   } else {
     // Tournament no longer exists in cloud (was deleted)
     document.getElementById('pub-title').textContent='Turnier nicht gefunden';
-    document.getElementById('pub-sub').textContent='Dieses Turnier wurde beendet oder gelöscht.';
+    document.getElementById('pub-sub').textContent='Powered by WAMPN';
     document.getElementById('pub-logo').innerHTML='🏁';
     const liveBadge=document.getElementById('pub-live-badge');
     if(liveBadge)liveBadge.style.display='none';
@@ -3880,7 +3880,7 @@ async function renderPublic(){
     return;
   }
   document.getElementById('pub-title').textContent=t.name;
-  document.getElementById('pub-sub').textContent=t.sport+' · '+t.phase;
+  document.getElementById('pub-sub').textContent='Powered by WAMPN';
   document.getElementById('pub-logo').innerHTML=t.logo?`<img src="${t.logo}" style="width:100%;height:100%;object-fit:cover">`:sportIcon(t.sport);
   // Live badge: show only when ≥1 result entered AND not archived/finished/deleted
   const liveBadge=document.getElementById('pub-live-badge');
